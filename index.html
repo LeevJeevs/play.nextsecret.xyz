@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Minecraft Server Status</title>
+  <style>
+    :root {
+      --bg: #0f1220;
+      --card: #171a2b;
+      --text: #e6e8f0;
+      --muted: #aab0c0;
+      --ok: #2ecc71;
+      --bad: #e74c3c;
+      --accent: #5c7cfa;
+      --border: #242841;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: radial-gradient(900px 500px at 10% 10%, #141735, #0f1220);
+      color: var(--text); font: 14px/1.6 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      display: grid; place-items: center; min-height: 100vh; padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 840px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      overflow: hidden;
+    }
+    header {
+      padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 12px rgba(231,76,60,.6); }
+    .dot.online { background: var(--ok); box-shadow: 0 0 12px rgba(46,204,113,.6); }
+    .title { font-weight: 700; letter-spacing: .3px; }
+    .sub { color: var(--muted); font-size: 12px; }
+    .grid {
+      display: grid; grid-template-columns: 1.1fr .9fr; gap: 0; align-items: start;
+    }
+    .section { padding: 16px 20px; border-right: 1px solid var(--border); }
+    .section:last-child { border-right: none; }
+    h3 {
+      margin: 0 0 8px; font-size: 14px; font-weight: 700; letter-spacing: .2px; color: var(--text);
+    }
+    .motd {
+      background: #121529; border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px; min-height: 64px;
+    }
+    .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; }
+    .label { color: var(--muted); }
+    .value { font-weight: 600; color: var(--text); }
+    .row { display: flex; gap: 10px; align-items: center; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #121529; border: 1px solid var(--border); border-radius: 999px; padding: 6px 10px;
+      font-weight: 600;
+    }
+    .pill .sig { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
+    .pill.online .sig { background: var(--ok); }
+    footer {
+      padding: 14px 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 8px;
+      padding: 8px 12px; font-weight: 700; cursor: pointer;
+    }
+    code { background: #121529; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border); }
+    a { color: #9fb4ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+      .section { border-right: none; border-bottom: 1px solid var(--border); }
+      .section:last-child { border-bottom: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <header>
+      <div id="statusDot" class="dot"></div>
+      <div>
+        <div class="title" id="serverTitle">Minecraft Server</div>
+        <div class="sub" id="serverAddr">Loading...</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="section">
+        <h3>Message of the day</h3>
+        <div id="motd" class="motd">Fetching MOTD…</div>
+      </section>
+
+      <section class="section">
+        <h3>Server status</h3>
+        <div class="row" style="margin-bottom:10px;">
+          <div id="pill" class="pill"><span class="sig"></span><span id="pillText">Offline</span></div>
+          <div class="pill"><span>Auto refresh</span><span id="refreshRate">30s</span></div>
+        </div>
+        <div class="kv">
+          <div class="label">Players</div>
+          <div class="value" id="players">—</div>
+
+          <div class="label">Version</div>
+          <div class="value" id="version">—</div>
+
+          <div class="label">IP / Host</div>
+          <div class="value" id="iphost">—</div>
+
+          <div class="label">Port</div>
+          <div class="value" id="port">—</div>
+
+          <div class="label">Latency</div>
+          <div class="value" id="latency">—</div>
+
+          <div class="label">Last checked</div>
+          <div class="value" id="checked">—</div>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      <div>Tip: point your client at <code id="joinAddr">example.org:25565</code></div>
+      <button id="refreshBtn" class="btn">Refresh now</button>
+    </footer>
+  </div>
+
+  <script>
+    // Configure your server address here:
+    const SERVER_HOST = "example.org";   // e.g., "play.example.org"
+    const SERVER_PORT = 25565;           // usually 25565
+    const REFRESH_MS = 30000;            // 30s auto-refresh
+
+    const els = {
+      dot: document.getElementById("statusDot"),
+      title: document.getElementById("serverTitle"),
+      addr: document.getElementById("serverAddr"),
+      motd: document.getElementById("motd"),
+      players: document.getElementById("players"),
+      version: document.getElementById("version"),
+      iphost: document.getElementById("iphost"),
+      port: document.getElementById("port"),
+      latency: document.getElementById("latency"),
+      checked: document.getElementById("checked"),
+      pill: document.getElementById("pill"),
+      pillText: document.getElementById("pillText"),
+      joinAddr: document.getElementById("joinAddr"),
+      refreshRate: document.getElementById("refreshRate"),
+      refreshBtn: document.getElementById("refreshBtn"),
+    };
+
+    function setOnlineUI(isOnline) {
+      els.dot.classList.toggle("online", isOnline);
+      els.pill.classList.toggle("online", isOnline);
+      els.pillText.textContent = isOnline ? "Online" : "Offline";
+    }
+
+    function fmtPlayers(playersObj) {
+      const online = (playersObj && typeof playersObj.online === "number") ? playersObj.online : 0;
+      const max = (playersObj && typeof playersObj.max === "number") ? playersObj.max : "—";
+      const list = (playersObj && Array.isArray(playersObj.list)) ? playersObj.list : [];
+      const names = list.map(p => typeof p === "string" ? p : (p && p.name) || "").filter(Boolean);
+      return `${online} / ${max}` + (names.length ? ` (${names.join(", ")})` : "");
+    }
+
+    function safeHTML(htmlArr) {
+      // api.mcsrvstat.us provides sanitized HTML spans for MOTD; join them safely.
+      if (!htmlArr || !Array.isArray(htmlArr) || !htmlArr.length) return "";
+      return htmlArr.join("<br/>");
+    }
+
+    async function fetchStatus() {
+      const start = performance.now();
+      const url = `https://api.mcsrvstat.us/3/${encodeURIComponent(SERVER_HOST)}:${SERVER_PORT}`;
+      els.addr.textContent = `${SERVER_HOST}:${SERVER_PORT}`;
+      els.title.textContent = "Minecraft Server";
+      els.joinAddr.textContent = `${SERVER_HOST}:${SERVER_PORT}`;
+      els.refreshRate.textContent = `${Math.round(REFRESH_MS/1000)}s`;
+
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        const data = await res.json();
+        const latencyMs = Math.max(0, Math.round(performance.now() - start));
+
+        setOnlineUI(Boolean(data.online));
+        els.motd.innerHTML = data.motd && data.motd.html ? safeHTML(data.motd.html) : (data.motd && data.motd.clean ? data.motd.clean.join("\n") : "No MOTD");
+        els.players.textContent = data.players ? fmtPlayers(data.players) : "—";
+        els.version.textContent = data.version || "—";
+        els.iphost.textContent = `${data.hostname || SERVER_HOST} / ${data.ip || "—"}`;
+        els.port.textContent = data.port || SERVER_PORT;
+        els.latency.textContent = `${latencyMs} ms (client fetch)`;
+        els.checked.textContent = new Date().toLocaleString();
+
+      } catch (err) {
+        setOnlineUI(false);
+        els.motd.textContent = "Could not fetch status.";
+        els.players.textContent = "—";
+        els.version.textContent = "—";
+        els.iphost.textContent = `${SERVER_HOST} / —`;
+        els.port.textContent = SERVER_PORT;
+        els.latency.textContent = "—";
+        els.checked.textContent = new Date().toLocaleString();
+      }
+    }
+
+    let intervalId = null;
+    function startAutoRefresh() {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(fetchStatus, REFRESH_MS);
+    }
+
+    els.refreshBtn.addEventListener("click", fetchStatus);
+
+    // Initial load
+    fetchStatus();
+    startAutoRefresh();
+  </script>
+</body>
+</html>
