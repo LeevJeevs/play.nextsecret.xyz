@@ -1,2 +1,2 @@
-# play.axioform
-just a minecraft server
+# play.nextsecret.xyz
+just a minecraft server statistics site
